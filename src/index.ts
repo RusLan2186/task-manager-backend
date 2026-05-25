@@ -14,10 +14,15 @@ import passport from "./lib/passport";
 const app = express();
 
 app.use(express.json());
-app.use(cors({
-  origin: "http://localhost:3000",
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "https://task-manager-frontend-ten-weld.vercel.app",
+    ],
+    credentials: true,
+  }),
+);
 app.use(cookieParser());
 app.use("/auth", authRoutes);
 
@@ -26,8 +31,6 @@ app.use("/projects/:projectId/tasks", taskRoutes);
 app.use("/projects", projectsRoutes);
 app.use("/users", userRoutes);
 app.use(passport.initialize());
-
-
 
 const PORT = Number(process.env.PORT) || 3000;
 
