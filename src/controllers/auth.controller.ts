@@ -64,7 +64,11 @@ export const loginUser = async (
     }
     const user = await login(parsedData.data);
 
-    res.cookie("token", user.token, { httpOnly: true });
+    res.cookie("token", user.token, {
+      httpOnly: true,
+      sameSite: "none",
+      secure: true,
+    });
     res.status(200).json(user.user);
   } catch (error: unknown) {
     if (error instanceof Error && error.message === INVALID_CREDENTIALS_ERROR) {
@@ -115,7 +119,11 @@ export const getMe = async (
 };
 
 export const logout = (req: Request, res: Response): void => {
-  res.clearCookie("token");
+  res.clearCookie("token", {
+    httpOnly: true,
+    sameSite: "none",
+    secure: true,
+  });
   res.status(200).json({ message: "Logged out successfully" });
 };
 
@@ -132,7 +140,11 @@ export const oauthCallback = (req: Request, res: Response): void => {
     { expiresIn: "1h" },
   );
 
-  res.cookie("token", token, { httpOnly: true });
+  res.cookie("token", token, {
+    httpOnly: true,
+    sameSite: "none",
+    secure: true,
+  });
   res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
 };
 
