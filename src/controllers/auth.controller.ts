@@ -133,7 +133,7 @@ export const oauthCallback = (req: Request, res: Response): void => {
   );
 
   res.cookie("token", token, { httpOnly: true });
-  res.redirect("http://localhost:3000/dashboard");
+  res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
 };
 
 export const verifyEmailController = async (req: Request, res: Response) => {
