@@ -1,0 +1,105 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum Status {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Provider {
+  GOOGLE
+  LOCAL
+  GITHUB
+}
+
+model User {
+  id Int @id @default(autoincrement())
+
+  email    String  @unique
+  name     String
+  password String?
+  role     Role    @default(MEMBER)
+
+  provider   Provider @default(LOCAL)
+  providerId String?  @unique
+
+  emailVerified          Boolean   @default(false)
+  verificationCode       String?
+  verificationCodeExpiry DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  projects  Project[]
+  tasks     Task[]
+  comments  Comment[]
+}
+
+model Project {
+  id          Int    @id @default(autoincrement())
+  title       String
+  description String
+  ownerId     Int
+  owner       User   @relation(fields: [ownerId], references: [id])
+  tasks       Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerId, title])
+}
+
+model Task {
+  id          Int    @id @default(autoincrement())
+  title       String
+  description String
+  status      Status @default(TODO)
+
+  priority Priority @default(LOW)
+
+  projectId Int
+  project   Project @relation(fields: [projectId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assigneeId Int?
+  assignee   User?     @relation(fields: [assigneeId], references: [id])
+  comments   Comment[]
+
+  @@unique([projectId, title])
+}
+
+model Comment {
+  id     Int    @id @default(autoincrement())
+  text   String
+  taskId Int
+  task   Task   @relation(fields: [taskId], references: [id])
+
+  authorId Int
+  author   User @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
