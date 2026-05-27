@@ -49,9 +49,10 @@ model User {
   verificationCode       String?
   verificationCodeExpiry DateTime?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
   projects  Project[]
+  members   ProjectMember[]
   tasks     Task[]
   comments  Comment[]
 }
@@ -64,10 +65,24 @@ model Project {
   owner       User   @relation(fields: [ownerId], references: [id])
   tasks       Task[]
 
+  members ProjectMember[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([ownerId, title])
+}
+
+model ProjectMember {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  memberId  Int
+  member    User     @relation(fields: [memberId], references: [id])
+  projectId Int
+  project   Project  @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, memberId])
 }
 
 model Task {

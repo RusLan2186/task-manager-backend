@@ -8,6 +8,7 @@ import { router as projectsRoutes } from "./routes/project.routes";
 import { router as taskRoutes } from "./routes/task.routes";
 import { router as commentRoutes } from "./routes/comment.routes";
 import { router as userRoutes } from "./routes/user.routes";
+import { router as memberRoutes } from "./routes/member.routes";
 
 import passport from "./lib/passport";
 
@@ -24,13 +25,14 @@ app.use(
   }),
 );
 app.use(cookieParser());
+app.use(passport.initialize());
 app.use("/auth", authRoutes);
 
 app.use("/tasks/:taskId/comments", commentRoutes);
 app.use("/projects/:projectId/tasks", taskRoutes);
 app.use("/projects", projectsRoutes);
 app.use("/users", userRoutes);
-app.use(passport.initialize());
+app.use("/projects/:projectId/members", memberRoutes);
 
 const PORT = Number(process.env.PORT) || 3000;
 
