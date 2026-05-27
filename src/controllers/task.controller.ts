@@ -9,7 +9,6 @@ import {
   taskCreateSchema,
   taskUpdateSchema,
   projectIdParamSchema,
-  taskIdParamSchema,
   taskIdWithProjectIdParamSchema,
 } from "../validators/task.validator";
 import { Priority } from "@prisma/client";
@@ -39,7 +38,7 @@ export const getAllTasks = async (
   const assigneeId = req.query.assigneeId
     ? Number(req.query.assigneeId)
     : undefined;
-    const sort = req.query.sort as "asc" | "desc" | undefined;
+  const sort = req.query.sort as "asc" | "desc" | undefined;
   if (priorityValue && priorityValue !== "ALL") {
     const validPriorities = Object.values(Priority);
     if (!validPriorities.includes(priority as Priority)) {
@@ -69,16 +68,40 @@ export const getAllTasks = async (
       priority,
       assigneeId,
       search,
-      sort
+      sort,
     );
     res.status(200).json(tasks);
   } catch (error) {
+    if (error instanceof Error && error.message === "Project not found") {
+      res.status(404).json({ error: error.message });
+      return;
+    }
+
+    if (
+      error instanceof Error &&
+      error.message ===
+        "You can only access tasks from projects where you are a member"
+    ) {
+      res.status(403).json({ error: error.message });
+      return;
+    }
+
     res.status(500).json({ error: "Internal Server Error" });
     console.error(error);
   }
 };
 
-export const createNewTask = async (req: Request, res: Response) => {
+export const createNewTask = async (
+  req: AuthenticatedRequest,
+  res: Response,
+) => {
+  const userId = req.user?.id;
+
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
   const parsedParams = projectIdParamSchema.safeParse(req.params);
   if (!parsedParams.success) {
     res.status(400).json({ error: parsedParams.error.flatten() });
@@ -92,14 +115,35 @@ export const createNewTask = async (req: Request, res: Response) => {
   }
 
   try {
-    const newTask = await createTask({
-      ...parsedBody.data,
-      projectId: parsedParams.data.projectId,
-      assigneeId: parsedBody.data.assigneeId ?? null,
-    });
+    const newTask = await createTask(
+      {
+        ...parsedBody.data,
+        projectId: parsedParams.data.projectId,
+        assigneeId: parsedBody.data.assigneeId ?? null,
+      },
+      userId,
+    );
     res.status(201).json(newTask);
   } catch (error) {
     if (error instanceof Error) {
+      if (error.message === "Project not found") {
+        res.status(404).json({ error: error.message });
+        return;
+      }
+
+      if (
+        error.message ===
+        "You can only access tasks from projects where you are a member"
+      ) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+
+      if (error.message === "Assignee must be a member of this project") {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+
       if (
         error.message === "Task with this title already exists in this project"
       ) {
@@ -145,7 +189,6 @@ export const taskUpdate = async (req: AuthenticatedRequest, res: Response) => {
       {
         id: parsedParams.data.id,
         ...parsedBody.data,
-        assigneeId: parsedBody.data.assigneeId ?? null,
       },
       userId,
     );
@@ -158,7 +201,7 @@ export const taskUpdate = async (req: AuthenticatedRequest, res: Response) => {
         res.status(409).json({ error: error.message });
         return;
       }
-      if (error.message === "This task doesn't exists in this project") {
+      if (error.message === "Task does not exist in this project") {
         res.status(404).json({ error: "Task not found" });
         return;
       }
@@ -170,6 +213,20 @@ export const taskUpdate = async (req: AuthenticatedRequest, res: Response) => {
         res.status(404).json({ error: error.message });
         return;
       }
+
+      if (error.message === "Assignee must be a member of this project") {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+
+      if (
+        error.message ===
+        "You can only access tasks from projects where you are a member"
+      ) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+
       if (error.message === "You can only edit tasks from your own projects") {
         res.status(403).json({ error: error.message });
         return;
@@ -198,7 +255,7 @@ export const removeTask = async (req: AuthenticatedRequest, res: Response) => {
     res.status(204).send();
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message === "This task doesn't exists in this project") {
+      if (error.message === "Task does not exist in this project") {
         res.status(404).json({ error: "Task not found" });
         return;
       }

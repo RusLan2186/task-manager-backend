@@ -1,13 +1,11 @@
 import express from "express";
-import { authenticate, authorize } from "../middleware/auth.middleware";
+import { authenticate } from "../middleware/auth.middleware";
 import {
   createNewTask,
   getAllTasks,
   removeTask,
   taskUpdate,
 } from "../controllers/task.controller";
-
-
 
 const router = express.Router({ mergeParams: true });
 

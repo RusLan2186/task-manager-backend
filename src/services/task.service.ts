@@ -21,6 +21,61 @@ interface TaskListOutput extends TaskOutput {
   canEdit: boolean;
 }
 
+const ensureProjectTaskAccess = async (projectId: number, userId: number) => {
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+    select: {
+      ownerId: true,
+      members: {
+        where: {
+          memberId: userId,
+        },
+        select: {
+          id: true,
+        },
+      },
+    },
+  });
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const isOwner = project.ownerId === userId;
+  const isMember = project.members.length > 0;
+
+  if (!isOwner && !isMember) {
+    throw new Error(
+      "You can only access tasks from projects where you are a member",
+    );
+  }
+
+  return { isOwner };
+};
+
+const ensureAssigneeIsProjectMember = async (
+  projectId: number,
+  assigneeId: number,
+) => {
+  const membership = await prisma.projectMember.findUnique({
+    where: {
+      projectId_memberId: {
+        projectId,
+        memberId: assigneeId,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!membership) {
+    throw new Error("Assignee must be a member of this project");
+  }
+};
+
 const taskSelect = {
   id: true,
   title: true,
@@ -43,6 +98,8 @@ export const getTasksByProject = async (
   search?: string,
   sort?: "asc" | "desc",
 ): Promise<TaskListOutput[]> => {
+  await ensureProjectTaskAccess(projectId, userId);
+
   const tasks = await prisma.task.findMany({
     where: {
       projectId,
@@ -72,12 +129,21 @@ export const getTasksByProject = async (
   }));
 };
 
-export const createTask = async (input: TaskInput): Promise<TaskOutput> => {
+export const createTask = async (
+  input: TaskInput,
+  userId: number,
+): Promise<TaskOutput> => {
   const { description, projectId, priority, assigneeId } = input;
   const title = input.title.trim();
 
   if (!title) {
     throw new Error("Task title is required");
+  }
+
+  await ensureProjectTaskAccess(projectId, userId);
+
+  if (assigneeId !== null) {
+    await ensureAssigneeIsProjectMember(projectId, assigneeId);
   }
 
   const taskExists = await prisma.task.findFirst({
@@ -143,16 +209,32 @@ export const updateTask = async (
       project: {
         select: {
           ownerId: true,
+          id: true,
+          members: {
+            where: {
+              memberId: userId,
+            },
+            select: {
+              id: true,
+            },
+          },
         },
       },
     },
   });
 
   if (!taskExists) {
-    throw new Error("This task doesn't exists in this project");
+    throw new Error("Task does not exist in this project");
   }
 
   const isOwner = taskExists.project.ownerId === userId;
+  const isMember = taskExists.project.members.length > 0;
+
+  if (!isOwner && !isMember) {
+    throw new Error(
+      "You can only access tasks from projects where you are a member",
+    );
+  }
 
   const changesRestrictedFields =
     (title !== undefined && title !== taskExists.title) ||
@@ -161,6 +243,10 @@ export const updateTask = async (
 
   if (!isOwner && changesRestrictedFields) {
     throw new Error("You can only edit tasks from your own projects");
+  }
+
+  if (assigneeId !== undefined && assigneeId !== null) {
+    await ensureAssigneeIsProjectMember(taskExists.project.id, assigneeId);
   }
 
   try {
@@ -200,6 +286,8 @@ export const deleteTask = async (
   id: number,
   userId: number,
 ) => {
+  await ensureProjectTaskAccess(projectId, userId);
+
   const taskExists = await prisma.task.findFirst({
     where: {
       id,
@@ -209,7 +297,7 @@ export const deleteTask = async (
   });
 
   if (!taskExists) {
-    throw new Error("This task doesn't exists in this project");
+    throw new Error("Task does not exist in this project");
   }
 
   if (taskExists.project.ownerId !== userId) {

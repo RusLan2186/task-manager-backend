@@ -24,7 +24,9 @@ export const getAllProjects = async (
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> => {
-  if (!req.user) {
+  const userId = req.user?.id;
+
+  if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -32,7 +34,7 @@ export const getAllProjects = async (
   try {
     const search = req.query.search as string;
     const sort = req.query.sort as "asc" | "desc" | undefined;
-    const projects = await getProjects(search, sort);
+    const projects = await getProjects(search, userId, sort);
 
     res.status(200).json(projects);
   } catch (error) {
@@ -58,7 +60,7 @@ export const getOneProject = async (
   }
 
   try {
-    const project = await getProjectById(parsedParams.data.projectId);
+    const project = await getProjectById(parsedParams.data.projectId, userId);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
       return;

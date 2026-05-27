@@ -13,21 +13,33 @@ interface ProjectOutput {
   description: string;
   ownerId: number;
   createdAt: Date;
+  canAccessTasks: boolean;
 }
 
-const projectSelect = {
+const getProjectSelect = (userId?: number) => ({
   id: true,
   title: true,
   description: true,
   ownerId: true,
   createdAt: true,
+  members: userId
+    ? {
+        where: {
+          memberId: userId,
+        },
+        select: {
+          id: true,
+        },
+      }
+    : false,
   owner: {
     select: { name: true },
   },
-} as const;
+});
 
 export const getProjects = async (
   search: string,
+  userId: number,
   sort?: "asc" | "desc",
 ): Promise<ProjectOutput[]> => {
   const projects = await prisma.project.findMany({
@@ -50,21 +62,34 @@ export const getProjects = async (
         }
       : undefined,
     orderBy: { createdAt: sort ?? "desc" },
-    select: projectSelect,
+    select: getProjectSelect(userId),
   });
 
-  return projects;
+  return projects.map(({ members, ...project }) => ({
+    ...project,
+    canAccessTasks: project.ownerId === userId || (members?.length ?? 0) > 0,
+  }));
 };
 
 export const getProjectById = async (
   projectId: number,
+  userId: number,
 ): Promise<ProjectOutput | null> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: projectSelect,
+    select: getProjectSelect(userId),
   });
 
-  return project;
+  if (!project) {
+    return null;
+  }
+
+  const { members, ...projectData } = project;
+  return {
+    ...projectData,
+    canAccessTasks:
+      projectData.ownerId === userId || (members?.length ?? 0) > 0,
+  };
 };
 
 export const createProject = async (
@@ -96,7 +121,7 @@ export const createProject = async (
     const project = await prisma.$transaction(async (tx) => {
       const newProject = await tx.project.create({
         data: { title, description, ownerId },
-        select: projectSelect,
+        select: getProjectSelect(ownerId),
       });
 
       await tx.projectMember.create({
@@ -106,7 +131,12 @@ export const createProject = async (
       return newProject;
     });
 
-    return project;
+    const { members, ...projectData } = project;
+    return {
+      ...projectData,
+      canAccessTasks:
+        projectData.ownerId === ownerId || (members?.length ?? 0) > 0,
+    };
   } catch (error: unknown) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
