@@ -26,7 +26,10 @@ const projectSelect = {
   },
 } as const;
 
-export const getProjects = async (search: string,   sort?: "asc" | "desc"): Promise<ProjectOutput[]> => {
+export const getProjects = async (
+  search: string,
+  sort?: "asc" | "desc",
+): Promise<ProjectOutput[]> => {
   const projects = await prisma.project.findMany({
     where: search
       ? {
@@ -90,13 +93,17 @@ export const createProject = async (
   }
 
   try {
-    const project = await prisma.project.create({
-      data: {
-        title,
-        description,
-        ownerId,
-      },
-      select: projectSelect,
+    const project = await prisma.$transaction(async (tx) => {
+      const newProject = await tx.project.create({
+        data: { title, description, ownerId },
+        select: projectSelect,
+      });
+
+      await tx.projectMember.create({
+        data: { projectId: newProject.id, memberId: ownerId },
+      });
+
+      return newProject;
     });
 
     return project;
