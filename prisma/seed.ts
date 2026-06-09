@@ -15,8 +15,10 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   await prisma.comment.deleteMany();
   await prisma.task.deleteMany();
+  await prisma.projectMember.deleteMany();
   await prisma.project.deleteMany();
   await prisma.user.deleteMany();
+
   // create users
   const usersData = [
     {
