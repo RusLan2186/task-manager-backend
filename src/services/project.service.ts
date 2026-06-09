@@ -178,6 +178,10 @@ export const deleteProject = async (projectId: number, ownerId: number) => {
       where: { projectId },
     });
 
+    await tx.projectMember.deleteMany({
+      where: { projectId },
+    });
+
     await tx.project.delete({ where: { id: projectId } });
   });
 };
